@@ -4,8 +4,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class Lexer {
-    private String input;
+    private final String input;
     private int currentPos;
+
+    // Longest ops first so "==" is not lexed as two "=" tokens.
+    private static final Pattern[] PATTERNS = {
+            Pattern.compile("^==|!=|<=|>=|&&|\\|\\|"),
+            Pattern.compile("^[+\\-*/%=<>!.,;(){}]"),
+            Pattern.compile("^\\d+"),
+            Pattern.compile("^[a-zA-Z_][a-zA-Z0-9_]*"),
+    };
 
     public Lexer(String input) {
         this.input = input;
@@ -24,13 +32,13 @@ public class Lexer {
             }
 
             Token token = nextToken();
-
-            if (token != null)
-                tokens.add(token);
-            else
-                throw new RuntimeException("Unkown character: " + token);
+            if (token == null) {
+                throw new RuntimeException("Unknown character: '" + currentChar + "'");
+            }
+            tokens.add(token);
         }
 
+        tokens.add(new Token(TokenType.EOF, ""));
         return tokens;
     }
 
@@ -39,26 +47,30 @@ public class Lexer {
             return null;
         }
 
-        String[] tokenPatterns = {
-                "if|else|while|for",
-                "[a-zA-Z_][a-zA-Z0-9_]*",
-                "\\d+",
-                "[+-/*=<>!]",
-                "[.,;(){}]",
-        };
+        String remaining = input.substring(currentPos);
 
-        TokenType[] tokenTypes = TokenType.values();
-
-        for (int i = 0; i < tokenPatterns.length; i++) {
-            Pattern pattern = Pattern.compile("^" + tokenPatterns[i]);
-            Matcher matcher = pattern.matcher(input.substring(currentPos));
-
-            if (matcher.find()) {
-                String value = matcher.group();
-                currentPos += value.length();
-                return new Token(tokenTypes[i], value);
+        for (Pattern pattern : PATTERNS) {
+            Matcher matcher = pattern.matcher(remaining);
+            if (!matcher.find()) {
+                continue;
             }
+
+            String value = matcher.group();
+            currentPos += value.length();
+            return new Token(resolveType(value), value);
         }
+
         return null;
+    }
+
+    private TokenType resolveType(String value) {
+        TokenType byLexeme = TokenType.fromLexeme(value);
+        if (byLexeme != null) {
+            return byLexeme;
+        }
+        if (Character.isDigit(value.charAt(0))) {
+            return TokenType.INT_LIT;
+        }
+        return TokenType.IDENT;
     }
 }

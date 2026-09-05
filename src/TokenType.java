@@ -51,4 +51,13 @@ public enum TokenType {
     public String getLexeme() {
         return lexeme;
     }
+
+    public static TokenType fromLexeme(String text) {
+        for (TokenType type : values()) {
+            if (!type.lexeme.isEmpty() && type.lexeme.equals(text)) {
+                return type;
+            }
+        }
+        return null;
+    }
 }
